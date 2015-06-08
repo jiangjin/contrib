@@ -84,7 +84,7 @@ func (w *cachedWriter) Written() bool {
 
 func (w *cachedWriter) Write(data []byte) (int, error) {
 	ret, err := w.ResponseWriter.Write(data)
-	if err == nil {
+	if err == nil && w.status < http.StatusBadRequest {
 		//cache response
 		store := w.store
 		newData := make([]byte, len(data))
