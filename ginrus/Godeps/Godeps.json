@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/gin-gonic/contrib/gzip",
+	"ImportPath": "github.com/gin-gonic/contrib/ginrus",
 	"GoVersion": "go1.3",
 	"Deps": [
 		{

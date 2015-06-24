@@ -2,64 +2,63 @@ package gzip
 
 import (
 	"compress/gzip"
-	"github.com/gin-gonic/gin"
+	"net/http"
+	"path/filepath"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 const (
-	encodingGzip = "gzip"
-
-	headerAcceptEncoding  = "Accept-Encoding"
-	headerContentEncoding = "Content-Encoding"
-	headerContentLength   = "Content-Length"
-	headerContentType     = "Content-Type"
-	headerVary            = "Vary"
-
 	BestCompression    = gzip.BestCompression
 	BestSpeed          = gzip.BestSpeed
 	DefaultCompression = gzip.DefaultCompression
 	NoCompression      = gzip.NoCompression
 )
 
-type gzipWriter struct {
-	gin.ResponseWriter
-	gzwriter *gzip.Writer
+func Gzip(level int) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !shouldCompress(c.Request) {
+			return
+		}
+		gz, err := gzip.NewWriterLevel(c.Writer, level)
+		if err != nil {
+			return
+		}
+
+		c.Header("Content-Encoding", "gzip")
+		c.Header("Vary", "Accept-Encoding")
+		c.Writer = &gzipWriter{c.Writer, gz}
+		defer func() {
+			c.Header("Content-Length", "")
+			gz.Close()
+		}()
+		c.Next()
+	}
 }
 
-func newGzipWriter(writer gin.ResponseWriter, gzwriter *gzip.Writer) *gzipWriter {
-	return &gzipWriter{writer, gzwriter}
+type gzipWriter struct {
+	gin.ResponseWriter
+	writer *gzip.Writer
 }
 
 func (g *gzipWriter) Write(data []byte) (int, error) {
-	return g.gzwriter.Write(data)
+	return g.writer.Write(data)
 }
 
-func Gzip(level int) gin.HandlerFunc {
+func shouldCompress(req *http.Request) bool {
+	if !strings.Contains(req.Header.Get("Accept-Encoding"), "gzip") {
+		return false
+	}
+	extension := filepath.Ext(req.URL.Path)
+	if len(extension) < 4 { // fast path
+		return true
+	}
 
-	return func(c *gin.Context) {
-		req := c.Request
-		if !strings.Contains(req.Header.Get(headerAcceptEncoding), encodingGzip) {
-			c.Next()
-			return
-		}
-
-		writer := c.Writer
-		gz, err := gzip.NewWriterLevel(writer, level)
-		if err != nil {
-			c.Next()
-			return
-		}
-
-		headers := writer.Header()
-		headers.Set(headerContentEncoding, encodingGzip)
-		headers.Set(headerVary, headerAcceptEncoding)
-
-		gzwriter := newGzipWriter(c.Writer, gz)
-		c.Writer = gzwriter
-		c.Next()
-		writer.Header().Del(headerContentLength)
-
-		gz.Close()
-		c.Writer = writer
+	switch extension {
+	case ".png", ".gif", ".jpeg", ".jpg":
+		return false
+	default:
+		return true
 	}
 }
