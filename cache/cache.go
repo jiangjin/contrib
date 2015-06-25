@@ -140,7 +140,7 @@ func CachePage(store CacheStore, expire time.Duration, handle gin.HandlerFunc) g
 		if err := store.Get(key, &cache); err != nil {
 			tempC := c.Copy()
 			// replace writer
-			writer := newCachedWriter(store, expire, tempC.Writer, key)
+			writer := newCachedWriter(store, expire, c.Writer, key)
 			tempC.Writer = writer
 			handle(tempC)
 		} else {
